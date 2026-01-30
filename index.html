@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="hu">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>Valósághű Rack Tervező</title>
+</head>
+
+<body>
+
+    <div id="controls">
+        <h2>Rack Designer</h2>
+
+        <label>Rack Magasság (RU)
+            <input type="number" id="totalRU" min="5" max="60" value="20">
+        </label>
+
+        <hr style="border: 0; border-bottom: 1px solid var(--glass-border); margin: 10px 0;">
+
+        <label>Eszköz neve
+            <input type="text" id="deviceName" placeholder="pl. Core Switch">
+        </label>
+
+        <label>Eszköz típusa
+            <select id="deviceType">
+                <option value="switch">Switch</option>
+                <option value="router">Router</option>
+                <option value="server">Server</option>
+                <option value="patch">Patch Panel</option>
+                <option value="fiber">Optika</option>
+                <option value="rendezo">Rendező</option>
+                <option value="ups">Szünetmentes</option>
+                <option value="media">Média Konverter</option>
+            </select>
+        </label>
+
+        <label>RU Magasság
+            <input type="number" id="deviceRU" min="1" max="10" value="1">
+        </label>
+
+        <label>Portok száma
+            <input type="number" id="devicePorts" min="0" value="24">
+        </label>
+
+        <button onclick="addDevice()">+ Eszköz Hozzáadása</button>
+
+        <hr style="border: 0; border-bottom: 1px solid var(--glass-border); margin: 10px 0;">
+
+        <label>Kábel Szín
+            <select id="cableColor">
+                <option value="#f1c40f">Sárga</option>
+                <option value="#3b82f6">Kék</option>
+                <option value="#95a5a6">Szürke</option>
+                <option value="#c11010">Piros</option>
+                <option value="#10b981">Zöld</option>
+            </select>
+        </label>
+
+        <button class="saveButton" onclick="saveRack()">Mentés (JSON)</button>
+        <button class="loadButton" onclick="loadRack()">Betöltés</button>
+
+        <!-- Hidden input for totalRU persistence if needed, though script handles prompt -->
+        <!-- Hidden input removed, now in sidebar -->
+    </div>
+
+    <div id="rack-container">
+        <div id="rack">
+            <div id="devices-layer"></div>
+            <svg id="cables"></svg>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

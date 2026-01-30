@@ -1,0 +1,689 @@
+:root {
+    /* --- Modern Dark Palette --- */
+    --bg-app: #0f1014;
+    --bg-panel: #18191f;
+    --bg-rack: #14151a;
+
+    --text-primary: #e6e7eb;
+    --text-secondary: #a0a2ac;
+    --text-muted: #5f616d;
+
+    --accent-primary: #3b82f6;
+    /* Modern Blue */
+    --accent-glow: rgba(59, 130, 246, 0.5);
+    --accent-success: #10b981;
+    --accent-danger: #ef4444;
+    --accent-warning: #f59e0b;
+
+    --rack-rail-color: #272832;
+    --rack-rail-hole: #000000;
+
+    --device-border: #000;
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-bg: rgba(30, 32, 40, 0.7);
+
+    --transition-speed: 0.2s;
+    --font-stack: 'Inter', 'Segoe UI', system-ui, sans-serif;
+}
+
+body {
+    font-family: var(--font-stack);
+    margin: 0;
+    background: var(--bg-app);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: row;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* --- Layout Structure --- */
+body>h1 {
+    display: none;
+    /* Hide default H1, move it to sidebar or header */
+}
+
+/* App Layout Wrapper (Needed if we change HTML structure, but for now we target existing flow) */
+/* We will assume controls become a sidebar and rack is main content */
+
+/* --- Controls Sidebar --- */
+#controls {
+    width: 300px;
+    height: 100vh;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--glass-border);
+    padding: 20px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
+    z-index: 100;
+    overflow-y: auto;
+}
+
+#controls h2 {
+    margin-top: 0;
+    font-size: 1.2rem;
+    color: var(--accent-primary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 1px solid var(--glass-border);
+    padding-bottom: 10px;
+}
+
+#controls label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+#controls input[type="text"],
+#controls input[type="number"],
+#controls select {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid #999;
+    border-radius: 6px;
+    padding: 10px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.9rem;
+    transition: all var(--transition-speed);
+}
+
+#controls input:focus,
+#controls select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+    background-color: #333;
+}
+
+#controls button {
+    background: var(--accent-primary);
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-speed);
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+    margin-top: 5px;
+}
+
+#controls button:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+#controls button.saveButton {
+    background: var(--accent-success);
+}
+
+#controls button.loadButton {
+    background: var(--text-muted);
+}
+
+/* --- Rack Area --- */
+#rack-container {
+    flex: 1;
+    height: 100vh;
+    margin: 0;
+    /* Override old margin */
+    overflow-y: auto;
+    /* Scrollable rack */
+    background: #222;
+    position: relative;
+    padding: 40px;
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+#rack {
+    width: 1000px;
+    /* Increased from 600px */
+    min-height: 100%;
+    position: relative;
+    background: #3a3a3a;
+    border-left: 15px solid #999;
+    border-right: 15px solid #999;
+    box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.8);
+    margin: 0 auto;
+    border-top: 1px solid #999
+        /* Center it */
+}
+
+/* Rack Rails (Pseudo-elements on #rack container logic would be hard, so we keep simple borders or use background) */
+#rack::before,
+#rack::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 15px;
+    background:
+        linear-gradient(to bottom, #000 10px, transparent 10px) center top / 10px 33.5px repeat-y;
+    z-index: 1;
+    opacity: 0.5;
+}
+
+#rack::before {
+    left: -15px;
+    border-right: 1px solid #333;
+}
+
+#rack::after {
+    right: -15px;
+    border-left: 1px solid #333;
+}
+
+
+/* --- RU Markers --- */
+.ru {
+    position: absolute;
+    width: 100%;
+    border-bottom: 1px solid #999;
+    color: #999;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    padding-left: 5px;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+/* --- Devices Common --- */
+.device {
+    position: absolute;
+    left: 1px;
+    width: calc(100% - 1px);
+    /* Fit within rack */
+    box-sizing: border-box;
+    border-radius: 2px;
+    background: #2a2a2a;
+    border: 1px solid #000;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        0 2px 5px rgba(0, 0, 0, 0.5);
+    z-index: 40;
+    /* Below cables (50) */
+    cursor: grab;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.device:hover {
+    /* z-index: 70; REMOVED to keep it below cables */
+    /* Even higher when hovering */
+    border-color: var(--accent-primary);
+}
+
+.device.dragging {
+    opacity: 0.8;
+    cursor: grabbing;
+    z-index: 100;
+}
+
+.delete-btn {
+    position: absolute;
+    top: 5px;
+    /* Top */
+    right: 5px;
+    /* Right */
+    transform: none;
+    /* Remove vertical centering */
+    width: 24px;
+    height: 24px;
+    background: var(--accent-danger);
+    color: white;
+    border-radius: 4px;
+    /* Square with rounded corners looks better in corner */
+    text-align: center;
+    line-height: 24px;
+    font-weight: bold;
+    font-size: 14px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 100;
+}
+
+.device:hover .delete-btn {
+    opacity: 1;
+}
+
+/* --- Device Specific Skins --- */
+
+.device.switch {
+    background:
+        /* 1. Réteg: Konzol port (kis kör) a bal szélen */
+        radial-gradient(circle, #000 30%, #444 40%, transparent 50%) no-repeat 45px 50% / 12px 12px,
+
+        /* 2. Réteg: "Mode" gomb (kis négyzet) */
+        linear-gradient(#555, #222) no-repeat 65px 50% / 6px 6px,
+
+        /* 3. Réteg: Szellőzőrács (függőleges vékony vonalak a jobb szélen) */
+        repeating-linear-gradient(90deg, #111 0px, #111 1px, transparent 1px, transparent 3px) no-repeat calc(100% - 15px) 50% / 30px 15px,
+
+        /* 4. Réteg: Fényvisszaverődés az előlapon */
+        linear-gradient(115deg, transparent 45%, rgba(255, 255, 255, 0.05) 50%, transparent 55%),
+
+        /* 5. Réteg: Alap fémes színátmenet */
+        linear-gradient(180deg, #2c3e50 0%, #1a252f 100%) !important;
+
+    /* Extra 3D keret a "fizikai" hatásért */
+    border-left: 1px solid #34495e !important;
+    border-top: 1px solid #7f8c8d !important;
+    border-right: 2px solid #0a0a0a !important;
+    border-bottom: 4px solid #050505 !important;
+
+    /* Belső élfény (inset shadow), hogy ne legyen lapos */
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+        0 8px 15px rgba(0, 0, 0, 0.6) !important;
+
+    border-radius: 1px !important;
+}
+
+.device.switch::before {
+    /* Brand Badge */
+    content: '';
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 30px;
+    height: 10px;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.device.switch::after {
+    content: 'SWITCH';
+    position: absolute;
+    bottom: 4px;
+    left: 6px;
+    color: #bebebe;
+    font-weight: 900;
+    font-size: 0.7em;
+    opacity: 0.6;
+}
+
+/* 2. ROUTER: Industrial Grey */
+.device.router {
+    /* 1. Réteg: Antenna csatlakozók (arany körök a két szélen) */
+    /* 2. Réteg: Soros port (fekete négyzet ezüst kerettel) */
+    /* 3. Réteg: Reset gomb (apró piros pont) */
+    /* 4. Réteg: Fénycsillanás a készülékházon */
+    /* 5. Réteg: Alap textúra (szálcsiszolt sötétszürke) */
+    background:
+        /* Antenna csatlakozók */
+        radial-gradient(circle, #d4af37 20%, #886b11 40%, transparent 50%) no-repeat 10px 50% / 10px 10px,
+        radial-gradient(circle, #d4af37 20%, #886b11 40%, transparent 50%) no-repeat calc(100% - 10px) 50% / 10px 10px,
+
+        /* Soros/Konzol port */
+        linear-gradient(#444, #444) no-repeat 35px 45% / 12px 12px,
+        linear-gradient(#111, #111) no-repeat 37px 47% / 8px 8px,
+
+        /* Reset lyuk */
+        radial-gradient(circle, #c0392b 40%, transparent 50%) no-repeat 55px 50% / 4px 4px,
+
+        /* Fényvisszaverődés */
+        linear-gradient(135deg, transparent 45%, rgba(255, 255, 255, 0.05) 50%, transparent 55%),
+
+        /* Alapszín és textúra */
+        repeating-linear-gradient(90deg, #213c25, #122418 1px, #000000 2px) !important;
+
+    /* 3D Keret: Ipari robusztus megjelenés */
+    border-left: 2px solid #34495e !important;
+    border-top: 1px solid #7f8c8d !important;
+    border-right: 2px solid #000 !important;
+    border-bottom: 4px solid #111 !important;
+
+    /* Mélységérzet: árnyékok a rack sín felett */
+    box-shadow:
+        inset 0 1px 2px rgba(255, 255, 255, 0.1),
+        0 6px 12px rgba(0, 0, 0, 0.6) !important;
+
+    border-radius: 3px !important;
+}
+
+.device.router::after {
+    content: 'ROUTER';
+    position: absolute;
+    bottom: 4px;
+    left: 6px;
+    color: #bebebe;
+    font-weight: 900;
+    font-size: 0.7em;
+    opacity: 0.6;
+}
+
+.device.router strong {
+    background: #000;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid #555;
+}
+
+/* 3. SERVER: Drive Bays Look */
+.device.server {
+    /* 1. Réteg: HDD fogantyúk króm hatással (bal szél) */
+    /* 2. Réteg: Süllyesztett HDD Bay panel */
+    /* 3. Réteg: Mikro-perforált hűtőrács (nagyon finom pöttyök) */
+    /* 4. Réteg: Szálcsiszolt fém alapszín */
+    background:
+        /* Prémium HDD fogantyúk króm éllel */
+        linear-gradient(90deg, #888 0%, #444 20%, #222 100%) no-repeat 12px 20% / 3px 65%,
+        linear-gradient(90deg, #888 0%, #444 20%, #222 100%) no-repeat 20px 20% / 3px 65%,
+        linear-gradient(90deg, #888 0%, #444 20%, #222 100%) no-repeat 28px 20% / 3px 65%,
+        linear-gradient(90deg, #888 0%, #444 20%, #222 100%) no-repeat 36px 20% / 3px 65%,
+
+        /* HDD Panel mélyítése */
+        linear-gradient(#050505, #0a0a0a) no-repeat 8px 15% / 35px 70%,
+
+        /* Mikro-rácsozás (finomabb ventilátor rács) */
+        radial-gradient(circle, #000 25%, transparent 20%) repeat 0 0 / 3px 3px,
+
+        /* Szálcsiszolt sötétszürke fém alapszín */
+        linear-gradient(180deg, #323234 0%, #1c1c1e 100%) !important;
+
+    /* Profi élmegmunkálás */
+    border-top: 1px solid #999 !important;
+    border-left: 1px solid #555 !important;
+    border-right: 2px solid #000 !important;
+    border-bottom: 4px solid #000 !important;
+
+    /* Rétegelt árnyékok a "tömör vas" hatáshoz */
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.15),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+        0 10px 20px rgba(0, 0, 0, 0.6) !important;
+
+    border-radius: 1px !important;
+}
+
+/* Grid pattern for drive bays created in JS or CSS? CSS is cleaner for visual pattern */
+.device.server::after {
+    content: 'SERVER';
+    position: absolute;
+    bottom: 4px;
+    left: 6px;
+    color: #bebebe;
+    font-weight: 900;
+    font-size: 0.7em;
+    opacity: 0.6;
+}
+
+/* 4. UPS: Battery Look */
+.device.ups {
+    background: #2d3436;
+    border: 1px solid #000;
+}
+
+/* 5. PATCH PANEL: Clean Metal */
+.device.patch {
+    /* 1. Réteg: Rögzítő csavarok a sarkokban (4 db ezüst pont) */
+    /* 2. Réteg: Fehér feliratozó sáv (középen végig) */
+    /* 3. Réteg: Port-csoportok imitálása (sötét téglalapok) */
+    /* 4. Réteg: Alap háttér (matt fekete/sötétszürke fém) */
+    background:
+        /* Csavarok a 4 sarokban */
+        radial-gradient(circle, #777 20%, #222 50%, transparent 60%) no-repeat 5px 5px / 6px 6px,
+        radial-gradient(circle, #777 20%, #222 50%, transparent 60%) no-repeat calc(100% - 5px) 5px / 6px 6px,
+        radial-gradient(circle, #777 20%, #222 50%, transparent 60%) no-repeat 5px calc(100% - 5px) / 6px 6px,
+        radial-gradient(circle, #777 20%, #222 50%, transparent 60%) no-repeat calc(100% - 5px) calc(100% - 5px) / 6px 6px,
+
+        /* Fehér feliratozó sáv a portok felett */
+        linear-gradient(#eee, #ccc) no-repeat center 15% / 85% 4px,
+
+        /* Port-csoportok (3 db sötét blokk, ami a 24 port helyét jelzi) */
+        linear-gradient(90deg, #000 0%, #000 100%) no-repeat 10% 65% / 25% 15px,
+        linear-gradient(90deg, #000 0%, #000 100%) no-repeat 50% 65% / 25% 15px,
+        linear-gradient(90deg, #000 0%, #000 100%) no-repeat 90% 65% / 25% 15px,
+
+        /* Alap textúra */
+        linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%) !important;
+
+    /* Extra vékony, de éles peremek */
+    border: 1px solid #000 !important;
+    border-top: 1px solid #333 !important;
+    border-bottom: 2px solid #000 !important;
+
+    /* Süllyesztett hatás */
+    box-shadow:
+        inset 0 1px 3px rgba(0, 0, 0, 0.8),
+        0 4px 6px rgba(0, 0, 0, 0.4) !important;
+
+    border-radius: 1px !important;
+}
+
+.device.patch::after {
+    content: 'PATCH PANEL';
+    position: absolute;
+    bottom: 4px;
+    left: 6px;
+    color: #bebebe;
+    font-weight: 900;
+    font-size: 0.7em;
+    opacity: 0.6;
+}
+
+.device.fiber {
+    /* 1. Réteg: Vékony "száloptika" csillogás (átlós fehér-kék hajszálvékony vonalak) */
+    /* 2. Réteg: Süllyesztett port-csatorna (sötétebb sáv középen) */
+    /* 3. Réteg: Alap: Selyemfényű grafit fekete */
+    background:
+        /* Átlós "szálas" textúra */
+        repeating-linear-gradient(45deg, rgba(0, 200, 255, 0.05) 0px, rgba(0, 200, 255, 0.05) 1px, transparent 1px, transparent 10px),
+
+        /* A portok helyének sötétítése (süllyesztett sáv) */
+        linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)) no-repeat center 60% / 96% 35%,
+
+        /* Egy finom vízszintes fénycsík (mint egy lézer vonal) */
+        linear-gradient(90deg, transparent, rgba(0, 150, 255, 0.2), transparent) no-repeat center 42% / 100% 1px,
+
+        /* Fő gradiens (fekete fém) */
+        linear-gradient(180deg, #1c1c1e 0%, #0a0a0b 100%) !important;
+
+    /* Extra vékony, éles keretek */
+    border: 1px solid #000 !important;
+    border-top: 1px solid #444 !important;
+    border-bottom: 2px solid #000 !important;
+
+    /* Mélység és prémium ragyogás */
+    box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.05),
+        0 4px 15px rgba(0, 0, 0, 0.8) !important;
+
+    border-radius: 1px !important;
+}
+
+.device.fiber::after {
+    content: 'OPTIKA PANEL';
+    position: absolute;
+    bottom: 4px;
+    left: 6px;
+    color: #bebebe;
+    font-weight: 900;
+    font-size: 0.7em;
+    opacity: 0.6;
+}
+
+/* 7. RENDEZO: Brush/Empty */
+.device.rendezo {
+    background: #111;
+    box-shadow: inset 0 0 10px #000;
+    border: none;
+    z-index: 90;
+    /* Higher than cables (50) so cables run behind it */
+}
+
+.device.media {
+    background:
+        linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3)),
+        repeating-linear-gradient(90deg, #2c2c2c 0px, #2c2c2c 1px, #333 2px, #2c2c2c 3px);
+
+    border: 1px solid #111;
+    border-top: 1px solid #555;
+    /* Felülről jövő fény */
+    border-left: 1px solid #444;
+    border-radius: 6px;
+
+    /* Külső árnyék és belső élfény */
+    box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.2),
+        0 10px 20px rgba(0, 0, 0, 0.6),
+        0 2px 5px rgba(0, 0, 0, 0.8);
+
+    overflow: hidden;
+}
+
+.device.media::after {
+    content: 'MEDIA KONVERTER';
+    position: absolute;
+    bottom: 4px;
+    left: 6px;
+    color: #bebebe;
+    font-weight: 900;
+    font-size: 0.7em;
+    opacity: 0.6;
+}
+
+/* --- Ports Container --- */
+.ports-container {
+    position: relative;
+    width: 100%;
+    min-height: 80px;
+    z-index: 5;
+}
+
+/* --- Ports --- */
+.port {
+    position: absolute;
+    /* Absolute positioning for free movement */
+    width: 32px;
+    /* Fixed width */
+    height: 26px;
+    /* Slightly taller */
+    background: #000;
+    border: 1px solid #444;
+    border-radius: 2px;
+    cursor: grab;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8);
+    color: #777;
+    font-size: 10px;
+    /* Larger font */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.port:hover {
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+}
+
+.port.connected {
+    background: #111;
+    box-shadow: 0 0 5px var(--accent-success);
+    border-color: var(--accent-success);
+}
+
+.port.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.6);
+    border-color: var(--accent-primary);
+    z-index: 1000;
+}
+
+.port.drag-over {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 10px var(--accent-glow), inset 0 0 10px rgba(59, 130, 246, 0.3);
+    transform: scale(1.05);
+}
+
+/* Gold Finger Contacts simulation */
+.port::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 20%;
+    width: 60%;
+    height: 2px;
+    background: #a88d32;
+    /* Gold */
+}
+
+/* --- Cables (SVG) --- */
+svg#cables {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 50;
+    filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.5));
+}
+
+/* --- Devices Layer --- */
+#devices-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    /* Allow clicks to pass through to children */
+    /* No z-index here - let individual devices control their own z-index */
+}
+
+#devices-layer>* {
+    pointer-events: auto;
+    /* Re-enable pointer events for actual devices */
+}
+
+path {
+    transition: stroke-width 0.2s;
+    cursor: pointer;
+}
+
+path:hover {
+    stroke-width: 6 !important;
+    filter: drop-shadow(0 0 5px white);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-app);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--text-muted);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}
