@@ -10,8 +10,12 @@
 
 <body>
 
+    <button id="menuToggle">☰</button>
+
     <div id="controls">
-        <h2>Rack Designer</h2>
+        <div class="controls-header">
+            <h2>Rack Designer</h2>
+        </div>
 
         <label>Rack Magasság (RU)
             <input type="number" id="totalRU" min="5" max="60" value="20">
@@ -46,7 +50,6 @@
 
         <button onclick="addDevice()">+ Eszköz Hozzáadása</button>
 
-        <hr style="border: 0; border-bottom: 1px solid var(--glass-border); margin: 10px 0;">
 
         <label>Kábel Szín
             <select id="cableColor">
@@ -57,6 +60,8 @@
                 <option value="#10b981">Zöld</option>
             </select>
         </label>
+
+        <hr style="border: 0; border-bottom: 1px solid var(--glass-border); margin: 10px 0;">
 
         <button class="saveButton" onclick="saveRack()">Mentés (JSON)</button>
         <button class="loadButton" onclick="loadRack()">Betöltés</button>

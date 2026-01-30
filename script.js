@@ -58,6 +58,30 @@ function attachPortDragListeners(port) {
             e.preventDefault();
             e.stopPropagation();
 
+            const device = port.closest('.device');
+            if (!device) return;
+
+            // HA még nem absolute, akkor azzá tesszük a jelenlegi pozíciójában
+            if (window.getComputedStyle(port).position !== 'absolute') {
+                const portRect = port.getBoundingClientRect();
+                const deviceRect = device.getBoundingClientRect();
+
+                // Számoljuk ki a relatív pozíciót a device-hoz képest
+                // Figyelembe véve a border-t is ha van (device border)
+                const relativeLeft = portRect.left - deviceRect.left - (device.clientLeft || 0);
+                const relativeTop = portRect.top - deviceRect.top - (device.clientTop || 0);
+
+                // Átállítjuk absolute-ra
+                port.style.position = 'absolute';
+                port.style.left = relativeLeft + 'px';
+                port.style.top = relativeTop + 'px';
+                port.style.margin = '0'; // Flex gap/margin eltüntetése
+                port.style.zIndex = '1000'; // Hogy biztosan felül legyen
+
+                // Átmozgatjuk közvetlenül a device alá, hogy a koordinátarendszer tiszta legyen
+                device.appendChild(port);
+            }
+
             isDragging = true;
             port.classList.add('dragging');
             port.style.cursor = 'grabbing';
@@ -65,11 +89,11 @@ function attachPortDragListeners(port) {
             // Kezdő pozíciók mentése
             startX = e.clientX;
             startY = e.clientY;
-            initialLeft = parseInt(port.style.left) || 0;
-            initialTop = parseInt(port.style.top) || 0;
+            initialLeft = parseFloat(port.style.left) || 0;
+            initialTop = parseFloat(port.style.top) || 0;
 
             // Megakadályozza az eszköz drag-elését
-            port.closest('.device').draggable = false;
+            device.draggable = false;
         }
     });
 
@@ -78,9 +102,24 @@ function attachPortDragListeners(port) {
 
         e.preventDefault();
 
-        // Új pozíció számítása
-        const deltaX = e.clientX - startX;
-        const deltaY = e.clientY - startY;
+        // Calculate Scale Factor if applicable
+        const rack = document.getElementById('rack');
+        let scale = 1;
+        if (rack) {
+            // Parse current transform scale if it exists
+            const transform = window.getComputedStyle(rack).transform;
+            if (transform && transform !== 'none') {
+                // matrix(scale, 0, 0, scale, x, y)
+                const values = transform.split('(')[1].split(')')[0].split(',');
+                const a = parseFloat(values[0]);
+                const b = parseFloat(values[1]);
+                scale = Math.sqrt(a * a + b * b);
+            }
+        }
+
+        // Új pozíció számítása (Corrected for scale)
+        const deltaX = (e.clientX - startX) / scale;
+        const deltaY = (e.clientY - startY) / scale;
 
         let newLeft = initialLeft + deltaX;
         let newTop = initialTop + deltaY;
@@ -89,14 +128,17 @@ function attachPortDragListeners(port) {
         const device = port.closest('.device');
 
         if (device) {
-            const deviceRect = device.getBoundingClientRect();
+            // Use offsetWidth/Height for proper boundary calculation
+            // Account for port size to ensure it stays fully within device
+            const portWidth = 32;
+            const portHeight = 26;
+            const margin = 2; // Kisebb margó a széléig
 
-            // Határok: ne lehessen kihúzni az eszközből
-            const maxLeft = deviceRect.width - 40; // 40px margó
-            const maxTop = deviceRect.height - 40;
+            const maxLeft = device.offsetWidth - portWidth - margin;
+            const maxTop = device.offsetHeight - portHeight - margin;
 
-            newLeft = Math.max(5, Math.min(newLeft, maxLeft));
-            newTop = Math.max(5, Math.min(newTop, maxTop));
+            newLeft = Math.max(margin, Math.min(newLeft, maxLeft));
+            newTop = Math.max(margin, Math.min(newTop, maxTop));
         }
 
         // Pozíció alkalmazása
@@ -107,8 +149,8 @@ function attachPortDragListeners(port) {
         port.dataset.posX = newLeft;
         port.dataset.posY = newTop;
 
-        // Kábelek valós idejű újrarajzolása
-        redrawCables();
+        // Kábelek valós idejű újrarajzolása (debounced)
+        requestAnimationFrame(() => redrawCables());
     });
 
     document.addEventListener('mouseup', (e) => {
@@ -178,8 +220,10 @@ function attachDeviceListeners(device, ruHeight) {
     });
 
     device.querySelectorAll('.port').forEach(port => {
-        // Port drag funkció hozzáadása
-        attachPortDragListeners(port);
+        // Csak a 48. port felett engedélyezzük a mozgatást (kérésre)
+        if (parseInt(port.dataset.port) > 48) {
+            attachPortDragListeners(port);
+        }
 
         port.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -287,36 +331,14 @@ function getDeviceHTMLContent(type, name, portCount) {
 
     // 2. PORTS GENERATION
     if (portCount > 0) {
-        const maxPerLine = 24;
         let portsHtml = '';
 
-        // Portok konténere
-        portsHtml += '<div class="ports-container" style="position: relative; width: 100%; min-height: 40px;">';
+        // Portok konténere - FLEXBOX layout a dinamikus töréshez
+        portsHtml += '<div class="ports-container">';
 
-        const portWidth = 32;
-        const portHeight = 26;
-        const gap = 2;
-        const deviceWidth = 1000; // Az eszköz szélessége (rack width)
-
-        // Sorok számának kiszámítása
-        const totalRows = Math.ceil(portCount / maxPerLine);
-
-        for (let row = 0; row < totalRows; row++) {
-            const portsInThisRow = Math.min(maxPerLine, portCount - (row * maxPerLine));
-
-            // Sor teljes szélességének kiszámítása
-            const rowWidth = portsInThisRow * portWidth + (portsInThisRow - 1) * gap;
-
-            // Középre igazítás: kezdő X pozíció
-            const startX = (deviceWidth - rowWidth) / 2;
-            const posY = 5 + row * (portHeight + gap + 5);
-
-            for (let col = 0; col < portsInThisRow; col++) {
-                const portNumber = row * maxPerLine + col + 1;
-                const posX = startX + col * (portWidth + gap);
-
-                portsHtml += `<div class="port" data-port="${portNumber}" data-pos-x="${posX}" data-pos-y="${posY}" style="position: absolute; left: ${posX}px; top: ${posY}px;">${portNumber}</div>`;
-            }
+        // Minden portot generálunk flex item-ként
+        for (let i = 1; i <= portCount; i++) {
+            portsHtml += `<div class="port" data-port="${i}" style="position: relative;">${i}</div>`;
         }
 
         portsHtml += '</div>';
@@ -507,23 +529,13 @@ function redrawCables() {
 function saveRack() {
     const devicesData = [];
     devicesLayer.querySelectorAll('.device').forEach(device => {
-        const ports = [];
-        device.querySelectorAll('.port').forEach(port => {
-            ports.push({
-                number: port.dataset.port,
-                x: parseInt(port.dataset.posX) || parseInt(port.style.left) || 0,
-                y: parseInt(port.dataset.posY) || parseInt(port.style.top) || 0
-            });
-        });
-
         devicesData.push({
             id: device.id,
             name: device.dataset.name,
             type: device.dataset.type,
             ru: parseInt(device.dataset.ru),
             top: device.style.top,
-            portCount: device.querySelectorAll('.port').length,
-            ports: ports
+            portCount: device.querySelectorAll('.port').length
         });
     });
 
@@ -617,18 +629,7 @@ function loadRack() {
                     attachDeviceListeners(device, d.ru);
                     devicesLayer.appendChild(device);
 
-                    // Restore port positions if saved
-                    if (d.ports && Array.isArray(d.ports)) {
-                        d.ports.forEach(portData => {
-                            const port = device.querySelector(`.port[data-port="${portData.number}"]`);
-                            if (port && portData.x !== undefined && portData.y !== undefined) {
-                                port.style.left = portData.x + 'px';
-                                port.style.top = portData.y + 'px';
-                                port.dataset.posX = portData.x;
-                                port.dataset.posY = portData.y;
-                            }
-                        });
-                    }
+                    // Port positions are now auto-handled by flexbox layout
                 });
 
                 data.cables.forEach(c => {
@@ -667,6 +668,159 @@ function loadRack() {
     document.body.appendChild(input);
     input.click();
     document.body.removeChild(input);
+}
+
+
+// --- RESPONSIVE / MOBILE LOGIC ---
+
+// 1. Rack Scaling
+function scaleRack() {
+    const rackContainer = document.getElementById('rack-container');
+    const rack = document.getElementById('rack');
+
+    if (!rack) return;
+
+    if (window.innerWidth <= 1024) {
+        // Available width for the rack (minus padding)
+        const availableWidth = window.innerWidth - 40; // 20px padding left/right
+        const rackWidth = 1000; // Fixed width of #rack
+
+        let scale = availableWidth / rackWidth;
+        // Don't scale up, only down
+        scale = Math.min(scale, 1);
+        // Minimum scale to keep usable
+        scale = Math.max(scale, 0.3);
+
+        rack.style.transform = `scale(${scale})`;
+        rack.style.transformOrigin = 'top center';
+
+    } else {
+        rack.style.transform = 'none';
+    }
+
+    // Redraw cables after scaling to ensure proper positioning
+    requestAnimationFrame(() => redrawCables());
+}
+
+// Debounced resize handler for better performance
+let resizeTimeout;
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+        scaleRack();
+        updateMenuButtonState();
+    }, 100);
+});
+
+// Call once on load
+window.addEventListener('load', scaleRack);
+setTimeout(scaleRack, 100);
+
+
+// 2. Menu Toggle
+const menuToggle = document.getElementById('menuToggle');
+const controls = document.getElementById('controls');
+
+// Function to update menu button icon based on current state
+function updateMenuButtonState() {
+    if (!menuToggle || !controls) return;
+
+    const isDesktop = window.innerWidth > 1024;
+    const isToggled = controls.classList.contains('toggled');
+
+    // Desktop: Default Open. Toggled means Closed.
+    // Mobile: Default Closed. Toggled means Open.
+    let isOpen = isDesktop ? !isToggled : isToggled;
+
+    menuToggle.textContent = isOpen ? '✕' : '☰';
+
+    // State enforcement moved to resize handler or removed to allow manual control
+}
+
+if (menuToggle) {
+    // Set initial state
+    updateMenuButtonState();
+
+    menuToggle.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent event bubbling
+
+        // Simple toggle - just flip the state
+        controls.classList.toggle('toggled');
+        updateMenuButtonState();
+    });
+
+    // Close menu when clicking outside (on rack) - mainly for Mobile Overlay
+    const rackContainer = document.getElementById('rack-container');
+    if (rackContainer) {
+        rackContainer.addEventListener('click', () => {
+            if (window.innerWidth <= 1024 && controls.classList.contains('toggled')) {
+                controls.classList.remove('toggled');
+                updateMenuButtonState();
+            }
+        });
+    }
+}
+
+
+// 3. Touch Event Mapping (Polyfill-like)
+// We map touch events to mouse events for the existing drag logic.
+
+function touchHandler(event) {
+    const touches = event.changedTouches;
+    const first = touches[0];
+    let type = "";
+
+    switch (event.type) {
+        case "touchstart": type = "mousedown"; break;
+        case "touchmove": type = "mousemove"; break;
+        case "touchend": type = "mouseup"; break;
+        default: return;
+    }
+
+    // Create simulated mouse event
+    const simulatedEvent = new MouseEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        detail: 1,
+        screenX: first.screenX,
+        screenY: first.screenY,
+        clientX: first.clientX,
+        clientY: first.clientY,
+        button: 0,
+        buttons: 1 // Primary button down
+    });
+
+    first.target.dispatchEvent(simulatedEvent);
+
+    // Prevent scrolling while dragging devices/ports
+    if (event.target.classList.contains('device') ||
+        event.target.classList.contains('port') ||
+        event.target.closest('.device')) {
+
+        // Only prevent default on move to stop scroll, 
+        // but we need to be careful not to block scrolling the rack itself if not dragging.
+
+        if (type === "mousemove") {
+            // We can check if we are actually dragging something.
+            // Ideally we should only preventDefault if our app logic consumed it.
+            // But for now, simple approach:
+            event.preventDefault();
+        }
+    }
+}
+
+document.addEventListener("touchstart", touchHandler, true);
+document.addEventListener("touchmove", touchHandler, { passive: false });
+document.addEventListener("touchend", touchHandler, true);
+document.addEventListener("touchcancel", touchHandler, true);
+
+
+// Override drawRUs to trigger scale
+const originalDrawRUs = drawRUs;
+drawRUs = function () {
+    originalDrawRUs();
+    scaleRack();
 }
 
 
