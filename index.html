@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="style.css">
     <title>Valósághű Rack Tervező</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 
 <body>
@@ -63,6 +64,8 @@
 
         <hr style="border: 0; border-bottom: 1px solid var(--glass-border); margin: 10px 0;">
 
+        <button class="saveButton" style="background:var(--accent-primary);" onclick="exportToImage()">Kép Mentése
+            (PNG)</button>
         <button class="saveButton" onclick="saveRack()">Mentés (JSON)</button>
         <button class="loadButton" onclick="loadRack()">Betöltés</button>
 
@@ -76,6 +79,8 @@
             <svg id="cables"></svg>
         </div>
     </div>
+
+
 
     <script src="script.js"></script>
 </body>

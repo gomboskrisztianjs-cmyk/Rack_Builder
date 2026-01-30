@@ -216,6 +216,9 @@ function attachDeviceListeners(device, ruHeight) {
 
         newTop = Math.round(newTop / RU_HEIGHT) * RU_HEIGHT;
         device.style.top = newTop + 'px';
+
+        // Update cables in real-time
+        requestAnimationFrame(() => redrawCables());
     });
     device.addEventListener('dragend', (e) => {
         device.style.opacity = 1;
@@ -287,7 +290,7 @@ function getDeviceHTMLContent(type, name, portCount) {
                     <div class="ups-display-simple" style="font-family:monospace; background:#0f0; color:#000; padding:2px 5px; border-radius:2px; font-size:10px;">230V</div>
                 </div>
                 <div class="ups-indicators" style="display:flex; gap:5px;">
-                    <div class="ups-indicator-led green" style="width:6px; height:6px; background:#0f0; border-radius:50%; box-shadow:0 0 5px #0f0;"></div>
+                    <div class="ups-indicator-led green led-blink" style="width:6px; height:6px; background:#0f0; border-radius:50%; box-shadow:0 0 5px #0f0;"></div>
                     <div class="ups-indicator-led" style="width:6px; height:6px; background:#444; border-radius:50%;"></div>
                     <div class="ups-indicator-led" style="width:6px; height:6px; background:#444; border-radius:50%;"></div>
                 </div>
@@ -309,8 +312,8 @@ function getDeviceHTMLContent(type, name, portCount) {
             <div style="display:flex; width:100%; justify-content:space-between; align-items:center; padding-bottom:5px;">
                 <strong style="background:#000; color:#aaa; padding:2px 6px; font-size:10px; border-radius:3px;">${name}</strong>
                 <div style="display:flex; gap:3px;">
-                     <div style="width:30px; height:6px; background:#333; border-radius:2px;"></div>
-                     <div style="width:30px; height:6px; background:#333; border-radius:2px;"></div>
+                     <div class="led-random" style="--delay:${Math.random()}; width:30px; height:6px; background:#0f0; border-radius:2px; box-shadow:0 0 4px #0f0;"></div>
+                     <div class="led-random" style="--delay:${Math.random()}; width:30px; height:6px; background:#0f0; border-radius:2px; box-shadow:0 0 4px #0f0;"></div>
                 </div>
             </div>`;
     }
@@ -319,8 +322,8 @@ function getDeviceHTMLContent(type, name, portCount) {
             <div style="display:flex; width:100%; justify-content:space-between; align-items:center; padding-bottom:5px;">
                 <strong style="background:#000; color:#aaa; padding:2px 6px; font-size:10px; border-radius:3px;">${name}</strong>
                 <div style="display:flex; gap:3px;">
-                     <div style="width:30px; height:6px; background:#333; border-radius:2px;"></div>
-                     <div style="width:30px; height:6px; background:#333; border-radius:2px;"></div>
+                     <div class="led-random" style="--delay:${Math.random()}; width:30px; height:6px; background:#0f0; border-radius:2px; box-shadow:0 0 4px #0f0;"></div>
+                     <div class="led-random" style="--delay:${Math.random()}; width:30px; height:6px; background:#0f0; border-radius:2px; box-shadow:0 0 4px #0f0;"></div>
                 </div>
             </div>`;
     }
@@ -329,7 +332,7 @@ function getDeviceHTMLContent(type, name, portCount) {
             <div style="display:flex; width:100%; justify-content:space-between; align-items:center; margin-bottom:5px;">
                 <div style="display:flex; gap:5px; align-items:center;">
                     <strong style="color:#fff; font-size:11px;">${name}</strong>
-                    <div style="width:10px; height:10px; background:rgba(255,255,255,0.1); border-radius:50%;"></div>
+                    <div class="led-blink" style="width:10px; height:10px; background:#0f0; border-radius:50%; box-shadow:0 0 5px #0f0;"></div>
                 </div>
             </div>`;
     }
@@ -520,9 +523,10 @@ function redrawCables() {
         path.setAttribute('stroke-linecap', 'round');
 
         path.setAttribute('data-cable-id', c.id);
+
         path.style.pointerEvents = 'auto'; // Kattintható
 
-        // TOOLTIP
+        // TOOLTIP & HOVER EFFECTS
         const d1 = c.p1.closest('.device');
         const d2 = c.p2.closest('.device');
         const name1 = d1.dataset.name || d1.dataset.type;
@@ -533,6 +537,17 @@ function redrawCables() {
         const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
         title.textContent = `${name1} (Port ${port1}) <--> ${name2} (Port ${port2})`;
         path.appendChild(title);
+
+        // FEATURE: PORT HIGHLIGHT ON HOVER
+        path.addEventListener('mouseenter', () => {
+            c.p1.classList.add('port-highlight');
+            c.p2.classList.add('port-highlight');
+        });
+
+        path.addEventListener('mouseleave', () => {
+            c.p1.classList.remove('port-highlight');
+            c.p2.classList.remove('port-highlight');
+        });
 
         // KÁBEL TÖRLÉS LOGIKA DUBALAKATTINTÁSRA
         path.addEventListener('dblclick', (e) => {
@@ -545,6 +560,10 @@ function redrawCables() {
                 // Portok állapotának visszaállítása
                 cables[indexToRemove].p1.classList.remove('connected');
                 cables[indexToRemove].p2.classList.remove('connected');
+
+                // BUGFIX: Törléskor vegyük le a highlightot is, mert a 'mouseleave' nem fut le
+                cables[indexToRemove].p1.classList.remove('port-highlight');
+                cables[indexToRemove].p2.classList.remove('port-highlight');
 
                 cables.splice(indexToRemove, 1);
             }
@@ -855,5 +874,35 @@ drawRUs = function () {
     originalDrawRUs();
     scaleRack();
 }
+
+
+
+// --- FEATURE: EXPORT TO IMAGE ---
+function exportToImage() {
+    const rackElement = document.getElementById("rack");
+    if (!rackElement) return;
+
+    // Show loading state? for now just process.
+    // Important: html2canvas needs the element to be visible and not scaled weirdly if possible.
+    // However, it handles basic transforms.
+
+    html2canvas(rackElement, {
+        backgroundColor: "#14151a", // Force dark background (otherwise transparent)
+        scale: 2, // Higher resolution
+        useCORS: true
+    }).then(canvas => {
+        // Create download link
+        const link = document.createElement('a');
+        link.download = 'rack-design.png';
+        link.href = canvas.toDataURL("image/png");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }).catch(err => {
+        console.error("Export failed:", err);
+        alert("Hiba történt a kép generálása közben.");
+    });
+}
+
 
 
