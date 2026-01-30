@@ -478,6 +478,17 @@ function addCable(p1, p2, color) {
 
 function redrawCables() {
     cablesSvg.innerHTML = '';
+    // Get current scale to correct coordinates
+    let scale = 1;
+    const rackStyles = window.getComputedStyle(rack);
+    const transform = rackStyles.transform;
+    if (transform && transform !== 'none') {
+        const values = transform.split('(')[1].split(')')[0].split(',');
+        const a = parseFloat(values[0]);
+        const b = parseFloat(values[1]);
+        scale = Math.sqrt(a * a + b * b);
+    }
+
     cables.forEach(c => {
         const r1 = c.p1.getBoundingClientRect();
         const r2 = c.p2.getBoundingClientRect();
@@ -489,10 +500,15 @@ function redrawCables() {
         const borderLeft = rack.clientLeft || 0;
         const borderTop = rack.clientTop || 0;
 
-        const x1 = r1.left - rackRect.left - borderLeft + r1.width / 2;
-        const y1 = r1.top - rackRect.top - borderTop + r1.height / 2;
-        const x2 = r2.left - rackRect.left - borderLeft + r2.width / 2;
-        const y2 = r2.top - rackRect.top - borderTop + r2.height / 2;
+        // SCALE CORRECTION: 
+        // The rackRect and r1/r2 are "screen pixels" (scaled).
+        // The SVG coordinate system is inside the scaled element, so it is "model pixels" (unscaled).
+        // We must divide screen pixel differences by scale to get model pixels.
+
+        const x1 = (r1.left - rackRect.left) / scale - borderLeft + (r1.width / scale) / 2;
+        const y1 = (r1.top - rackRect.top) / scale - borderTop + (r1.height / scale) / 2;
+        const x2 = (r2.left - rackRect.left) / scale - borderLeft + (r2.width / scale) / 2;
+        const y2 = (r2.top - rackRect.top) / scale - borderTop + (r2.height / scale) / 2;
 
         const dx = Math.abs(x2 - x1) / 2;
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
