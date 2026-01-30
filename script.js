@@ -46,135 +46,150 @@ function isPortConnected(portElement) {
 function attachPortDragListeners(port) {
     port.style.cursor = 'grab';
 
-    let isDragging = false;
+    let isDragActive = false;
+    let isMouseDown = false;
     let startX, startY, initialLeft, initialTop;
+    const DRAG_THRESHOLD = 5;
 
     port.addEventListener('mousedown', (e) => {
         // Csak bal egérgomb
         if (e.button !== 0) return;
 
-        // Ne indítson drag-et, ha kábel csatlakoztatás módban vagyunk
-        if (e.target.classList.contains('port') && !e.shiftKey) {
-            e.preventDefault();
-            e.stopPropagation();
+        // Ne indítson drag-et, ha kábel csatlakoztatás módban vagyunk (shiftKey)
+        if (e.shiftKey) return;
 
-            const device = port.closest('.device');
-            if (!device) return;
+        isMouseDown = true;
+        startX = e.clientX;
+        startY = e.clientY;
 
-            // HA még nem absolute, akkor azzá tesszük a jelenlegi pozíciójában
-            if (window.getComputedStyle(port).position !== 'absolute') {
-                const portRect = port.getBoundingClientRect();
-                const deviceRect = device.getBoundingClientRect();
-
-                // Számoljuk ki a relatív pozíciót a device-hoz képest
-                // Figyelembe véve a border-t is ha van (device border)
-                const relativeLeft = portRect.left - deviceRect.left - (device.clientLeft || 0);
-                const relativeTop = portRect.top - deviceRect.top - (device.clientTop || 0);
-
-                // Átállítjuk absolute-ra
-                port.style.position = 'absolute';
-                port.style.left = relativeLeft + 'px';
-                port.style.top = relativeTop + 'px';
-                port.style.margin = '0'; // Flex gap/margin eltüntetése
-                port.style.zIndex = '1000'; // Hogy biztosan felül legyen
-
-                // Átmozgatjuk közvetlenül a device alá, hogy a koordinátarendszer tiszta legyen
-                device.appendChild(port);
-            }
-
-            isDragging = true;
-            port.classList.add('dragging');
-            port.style.cursor = 'grabbing';
-
-            // Kezdő pozíciók mentése
-            startX = e.clientX;
-            startY = e.clientY;
-            initialLeft = parseFloat(port.style.left) || 0;
-            initialTop = parseFloat(port.style.top) || 0;
-
-            // Megakadályozza az eszköz drag-elését
-            device.draggable = false;
-        }
+        // NEM hívunk preventDefault-ot azonnal, hogy a click esemény létrejöhessen,
+        // ha a felhasználó nem mozdítja el az egeret.
     });
 
     document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
+        if (!isMouseDown) return;
 
-        e.preventDefault();
+        // Ha már drag módban vagyunk, végezzük a mozgatást
+        if (isDragActive) {
+            e.preventDefault();
 
-        // Calculate Scale Factor if applicable
-        const rack = document.getElementById('rack');
-        let scale = 1;
-        if (rack) {
-            // Parse current transform scale if it exists
-            const transform = window.getComputedStyle(rack).transform;
-            if (transform && transform !== 'none') {
-                // matrix(scale, 0, 0, scale, x, y)
-                const values = transform.split('(')[1].split(')')[0].split(',');
-                const a = parseFloat(values[0]);
-                const b = parseFloat(values[1]);
-                scale = Math.sqrt(a * a + b * b);
+            // Calculate Scale Factor if applicable
+            const rack = document.getElementById('rack');
+            let scale = 1;
+            if (rack) {
+                const transform = window.getComputedStyle(rack).transform;
+                if (transform && transform !== 'none') {
+                    const values = transform.split('(')[1].split(')')[0].split(',');
+                    const a = parseFloat(values[0]);
+                    const b = parseFloat(values[1]);
+                    scale = Math.sqrt(a * a + b * b);
+                }
+            }
+
+            // Új pozíció számítása (Corrected for scale)
+            const deltaX = (e.clientX - startX) / scale;
+            const deltaY = (e.clientY - startY) / scale;
+
+            let newLeft = initialLeft + deltaX;
+            let newTop = initialTop + deltaY;
+
+            // Eszköz határainak lekérése
+            const device = port.closest('.device');
+
+            if (device) {
+                const portWidth = 32;
+                const portHeight = 26;
+                const margin = 2; // Kisebb margó a széléig
+
+                const maxLeft = device.offsetWidth - portWidth - margin;
+                const maxTop = device.offsetHeight - portHeight - margin;
+
+                newLeft = Math.max(margin, Math.min(newLeft, maxLeft));
+                newTop = Math.max(margin, Math.min(newTop, maxTop));
+            }
+
+            // Pozíció alkalmazása
+            port.style.left = newLeft + 'px';
+            port.style.top = newTop + 'px';
+
+            // Data attribútumok frissítése
+            port.dataset.posX = newLeft;
+            port.dataset.posY = newTop;
+
+            // Kábelek valós idejű újrarajzolása (debounced)
+            requestAnimationFrame(() => redrawCables());
+
+        } else {
+            // Még nem vagyunk drag módban, de le van nyomva a gomb.
+            // Ellenőrizzük a threshold-ot.
+            const dist = Math.sqrt(Math.pow(e.clientX - startX, 2) + Math.pow(e.clientY - startY, 2));
+
+            if (dist > DRAG_THRESHOLD) {
+                // Drag init
+                isDragActive = true;
+                port.classList.add('dragging');
+                port.style.cursor = 'grabbing';
+
+                const device = port.closest('.device');
+                if (!device) return;
+
+                // INIT LOGIC (amit eddig mousedown-ban csináltunk)
+                // HA még nem absolute, akkor azzá tesszük a jelenlegi pozíciójában
+                if (window.getComputedStyle(port).position !== 'absolute') {
+                    const portRect = port.getBoundingClientRect();
+                    const deviceRect = device.getBoundingClientRect();
+
+                    const relativeLeft = portRect.left - deviceRect.left - (device.clientLeft || 0);
+                    const relativeTop = portRect.top - deviceRect.top - (device.clientTop || 0);
+
+                    port.style.position = 'absolute';
+                    port.style.left = relativeLeft + 'px';
+                    port.style.top = relativeTop + 'px';
+                    port.style.margin = '0';
+                    port.style.zIndex = '1000';
+                    device.appendChild(port);
+                }
+
+                initialLeft = parseFloat(port.style.left) || 0;
+                initialTop = parseFloat(port.style.top) || 0;
+
+                // Frissítjük a startX/Y-t az aktuálisra, hogy ne ugorjon egyet a threshold miatt?
+                // Vagy kompenzáljuk? 
+                // Egyszerűbb, ha a startX marad az eredeti kattintás helye, így "természetes" a húzás.
+                // De mivel a deltaX-et számoljuk, ha startX marad, akkor a delta 5 lesz hirtelen.
+                // Ez elfogadható.
+
+                device.draggable = false;
             }
         }
-
-        // Új pozíció számítása (Corrected for scale)
-        const deltaX = (e.clientX - startX) / scale;
-        const deltaY = (e.clientY - startY) / scale;
-
-        let newLeft = initialLeft + deltaX;
-        let newTop = initialTop + deltaY;
-
-        // Eszköz határainak lekérése
-        const device = port.closest('.device');
-
-        if (device) {
-            // Use offsetWidth/Height for proper boundary calculation
-            // Account for port size to ensure it stays fully within device
-            const portWidth = 32;
-            const portHeight = 26;
-            const margin = 2; // Kisebb margó a széléig
-
-            const maxLeft = device.offsetWidth - portWidth - margin;
-            const maxTop = device.offsetHeight - portHeight - margin;
-
-            newLeft = Math.max(margin, Math.min(newLeft, maxLeft));
-            newTop = Math.max(margin, Math.min(newTop, maxTop));
-        }
-
-        // Pozíció alkalmazása
-        port.style.left = newLeft + 'px';
-        port.style.top = newTop + 'px';
-
-        // Data attribútumok frissítése
-        port.dataset.posX = newLeft;
-        port.dataset.posY = newTop;
-
-        // Kábelek valós idejű újrarajzolása (debounced)
-        requestAnimationFrame(() => redrawCables());
     });
 
     document.addEventListener('mouseup', (e) => {
-        if (!isDragging) return;
+        if (!isMouseDown) return;
 
-        isDragging = false;
-        port.classList.remove('dragging');
-        port.style.cursor = 'grab';
+        isMouseDown = false;
 
-        // Végső pozíció mentése
-        const finalLeft = parseInt(port.style.left) || 0;
-        const finalTop = parseInt(port.style.top) || 0;
+        if (isDragActive) {
+            isDragActive = false;
+            port.classList.remove('dragging');
+            port.style.cursor = 'grab';
 
-        port.dataset.posX = finalLeft;
-        port.dataset.posY = finalTop;
+            // Végső pozíció mentése
+            const finalLeft = parseInt(port.style.left) || 0;
+            const finalTop = parseInt(port.style.top) || 0;
 
-        // Eszköz drag visszaengedése
-        const device = port.closest('.device');
-        if (device) {
-            device.draggable = true;
+            port.dataset.posX = finalLeft;
+            port.dataset.posY = finalTop;
+
+            // Eszköz drag visszaengedése
+            const device = port.closest('.device');
+            if (device) {
+                device.draggable = true;
+            }
+
+            // Kábelek újrarajzolása
+            redrawCables();
         }
-
-        // Kábelek újrarajzolása
-        redrawCables();
     });
 }
 
@@ -802,10 +817,12 @@ function touchHandler(event) {
         // but we need to be careful not to block scrolling the rack itself if not dragging.
 
         if (type === "mousemove") {
-            // We can check if we are actually dragging something.
-            // Ideally we should only preventDefault if our app logic consumed it.
-            // But for now, simple approach:
-            event.preventDefault();
+            // Only prevent default if we are actively dragging a port or device
+            // AND the element has been marked as dragging (which happens after threshold pass)
+            const isDraggingElement = document.querySelector('.dragging');
+            if (isDraggingElement) {
+                event.preventDefault();
+            }
         }
     }
 }
